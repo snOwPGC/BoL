@@ -1,8 +1,8 @@
 if myHero.charName ~= "Sona" then return end
 --[Libs]--
-require 'VPrediction'
-require 'SOW' 
-require 'AoE_Skillshot_Position'
+--require 'VPrediction'
+--require 'SOW' 
+--require 'AoE_Skillshot_Position'
 --[AutoUpdate]--
 local version = 1.00
 local AUTOUPDATE = true
@@ -27,7 +27,7 @@ end
 local RequireI = Require("SourceLib")
 RequireI:Add("vPrediction", "https://raw.github.com/Hellsing/BoL/master/common/VPrediction.lua")
 RequireI:Add("SOW", "https://raw.github.com/Hellsing/BoL/master/common/SOW.lua")
-RequireI:add("AoE_Skillshot_Position", "https://raw.github.com/snOwPGC/BoL/master/AoE_Skillshot_Position.lua")
+RequireI:Add("AoE_Skillshot_Position", "https://raw.github.com/snOwPGC/BoL/master/AoE_Skillshot_Position.lua")
 RequireI:Check()
 
 if RequireI.downloadNeeded == true then return end
