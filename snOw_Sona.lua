@@ -1,4 +1,4 @@
---[Change log
+--[Change log]
 --1.00 > Initil release
 --1.10 > Added auto Q harass
 --	   	 Added auto heal allies
