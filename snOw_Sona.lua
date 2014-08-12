@@ -1,10 +1,12 @@
+--[Change log
+--1.00 > Initil release
+--1.10 > Added auto Q harass
+--	   	 Added auto heal allies
+--		 Added min mata ratio to harass
+
 if myHero.charName ~= "Sona" then return end
---[Libs]--
---require 'VPrediction'
---require 'SOW' 
---require 'AoE_Skillshot_Position'
 --[AutoUpdate]--
-local version = 1.00
+local version = 1.10
 local AUTOUPDATE = true
 local SCRIPT_NAME = "snOw_Sona"
 --========--
@@ -38,8 +40,7 @@ function OnLoad()
 	--[Target]--
 	targetselq = TargetSelector(TARGET_LESS_CAST_PRIORITY, 650, DAMAGE_MAGIC)
 	targetselr = TargetSelector(TARGET_LESS_CAST_PRIORITY, 900, DAMAGE_MAGIC)
---	chasetotarget = TargetSelector(TARGET_LESS_CAST_PRIORITY, 1100, DAMAGE_MAGIC)
-	
+
 	_scriptMenu()
 	PrintChat("<font color=\"#ff99ff\">Sona by snOw v<b>"..version.."</b> loaded </font>")	
 end
@@ -59,17 +60,22 @@ function OnTick()
 	RREADY = (myHero:CanUseSpell(_R) == READY)
 	--[Target update]--
 	if QREADY then targetselq:update() end
---	if EREADY then chasetotarget:update() end
 	if RREADY then targetselr:update() end
-	
-	if Menu.miscs.healme then
+
+	if Menu.wheal.healme then -- 1.10
 		_healme()
+	end
+	if Menu.wheal.healallies then -- 1.10
+		_healallies()
 	end
 	if Menu.hotkeys.flee then
 		_flee()
 	end
 	if Menu.hotkeys.harass then
 		_harass()
+	end
+	if Menu.harassconfig.autoQ then
+		_autoharass()
 	end
 	if Menu.ult.autoult then
 		_autoR(targetselr.target)
@@ -104,6 +110,21 @@ function _scriptMenu()
 	--[Harass settings]--
 	Menu:addSubMenu("Harass setiings", "harassconfig")
 	Menu.harassconfig:addParam("useQ2", "Use Q", SCRIPT_PARAM_ONOFF, true)
+	Menu.harassconfig:addParam("manaharass", "Min mana to harass", SCRIPT_PARAM_SLICE, 0.15, 0 ,1 ,2) -- New 1.10
+	Menu.harassconfig:addParam("autoQ", "Auto harass using Q", SCRIPT_PARAM_ONKEYTOGGLE, false, 83) -- New 1.10
+	Menu.harassconfig:addParam("manaQ", "Min mana auto harass", SCRIPT_PARAM_SLICE, 0.15, 0 ,1 ,2) -- New 1.10
+	--[Ult Settings]--
+	Menu:addSubMenu("Ultimate settings", "ult")
+	Menu.ult:addParam("useult", "Use ult in combo", SCRIPT_PARAM_ONOFF, true)
+	Menu.ult:addParam("ultifx", "hit x enemys:", SCRIPT_PARAM_SLICE, 2, 1, 5, 0)	
+	Menu.ult:addParam("autouseult", "Auto use ult if hit x enemys", SCRIPT_PARAM_ONOFF, true)
+	Menu.ult:addParam("autoult","hit x enemys", SCRIPT_PARAM_SLICE, 2, 1, 5, 0)
+	--[W(heal) Settings]--
+	Menu:addSubMenu("W(heal) settings", "wheal")
+	Menu.wheal:addParam("healme", "Auto heal me", SCRIPT_PARAM_ONOFF, true)
+	Menu.wheal:addParam("healratio", "Auto heal ratio", SCRIPT_PARAM_SLICE, 0.15, 0 ,1 ,2)
+	Menu.wheal:addParam("healallies", "Auto heal allies", SCRIPT_PARAM_ONOFF, true) -- New 1.10
+	Menu.wheal:addParam("healalliesratio", "Auto heal allies ratio", SCRIPT_PARAM_SLICE, 0.15, 0 ,1 ,2)	--New 1.10
 	--[Drawings]--
 	Menu:addSubMenu("Draw settings", "draws")
 	Menu.draws:addParam("drw", "Always draw", SCRIPT_PARAM_ONOFF, false)
@@ -111,19 +132,12 @@ function _scriptMenu()
 	Menu.draws:addParam("drawW", "Draw W range", SCRIPT_PARAM_ONOFF, true)
 	Menu.draws:addParam("drawE", "Draw E range", SCRIPT_PARAM_ONOFF, true)
 	Menu.draws:addParam("drawR", "Draw R range", SCRIPT_PARAM_ONOFF, true)
-	--[Ult Settings]--
-	Menu:addSubMenu("Ultimate settings", "ult")
-	Menu.ult:addParam("useult", "Use ult in combo", SCRIPT_PARAM_ONOFF, true)
-	Menu.ult:addParam("ultifx", "hit x enemys:", SCRIPT_PARAM_SLICE, 2, 1, 5, 0)	
-	Menu.ult:addParam("autouseult", "Auto use ult if hit x enemys", SCRIPT_PARAM_ONOFF, true)
-	Menu.ult:addParam("autoult","hit x enemys", SCRIPT_PARAM_SLICE, 2, 1, 5, 0)
 	--[Other settings]--
 	Menu:addSubMenu("Other settings", "miscs")
 	Menu.miscs:addParam("packt", "Use packets(VIP)", SCRIPT_PARAM_ONOFF, false)
-	Menu.miscs:addParam("healme", "Auto heal me", SCRIPT_PARAM_ONOFF, true)
-	Menu.miscs:addParam("healratio", "Auto heal ratio", SCRIPT_PARAM_SLICE, 0.15, 0 ,1 ,2)
---	Menu.miscs:addParam("healallies", "Auto heal allies", SCRIPT_PARAM_ONOFF, true)
---	Menu.miscs:addParam("healalliesratio", "Auto heal allies ratio", SCRIPT_PARAM_SLICE, 0.15, 0 ,1 ,2)	
+--	Menu.miscs:addSubMenu("Lag Free Circle", "lagfree")
+	--Menu.miscs.lagfree:addParam("LFC", "Use Lag Free Circles(VIP)", SCRIPT_PARAM_ONOFF, false) 
+	--Menu.miscs.lagfree:addParam("CL", "Length before Snapping", SCRIPT_PARAM_SLICE, 300, 75, 2000, 0) 
 	--[Stream mode]--
 	Menu:addSubMenu("Stream mode", "stream")
 	Menu.stream:addParam("overlay","Disable overlay",SCRIPT_PARAM_ONKEYTOGGLE,false, 20)
@@ -137,7 +151,9 @@ function _scriptMenu()
 	--[Perma show]--
 	Menu.hotkeys:permaShow("combo")
 	Menu.hotkeys:permaShow("harass")
+	Menu.harassconfig:permaShow("autoQ")
 	Menu.hotkeys:permaShow("flee")
+	
 end
 
 function _draw()
@@ -175,7 +191,7 @@ end
 	
 function _harass() --Done
 	if ValidTarget(targetselq.target) then
-		if QREADY and Menu.harassconfig.useQ2 and GetDistance(targetselq.target) <= 650 then
+		if QREADY and Menu.harassconfig.useQ2 and GetDistance(targetselq.target) <= 650 and (player.mana / player.maxMana > Menu.harassconfig.manaharass) then
 			if Menu.miscs.packt then
 				Packet("S_CAST", {spellId = _Q}):send()
 			else
@@ -185,6 +201,17 @@ function _harass() --Done
 	end			
 end
 
+function _autoharass() --1.10
+	if ValidTarget(targetselq.target) then
+		if QREADY and GetDistance(targetselq.target) <= 650 and (player.mana / player.maxMana > Menu.harassconfig.manaQ) then
+			if Menu.miscs.packt then
+				Packet("S_CAST", {spellId = _Q}):send()
+			else
+				CastSpell(_Q)
+			end
+		end
+	end	
+end
 function _combo()
 	for i=1, heroManager.iCount do
 		local target = heroManager:GetHero(i)
@@ -213,8 +240,8 @@ function _combo()
 	
 end
 
-function _healme() -- Done
-		if WREADY and (player.health / player.maxHealth < Menu.miscs.healratio) then
+function _healme() -- Done 1.10
+		if WREADY and (player.health / player.maxHealth < Menu.wheal.healratio) then
 			if Menu.miscs.packt then
 				Packet("S_CAST", {spellId = _W}):send()
 			else
@@ -223,9 +250,17 @@ function _healme() -- Done
 		end
 end
 
-function healallies()
-	allies = GetAllyHeroes()
-	
+function _healallies()
+	for h=1, heroManager.iCount do
+		local allies = heroManager:getHero(h)
+		if allies.team == myHero.team and allies.team ~= TEAM_ENEMY and WREADY and (allies.health / allies.maxHealth < Menu.wheal.healalliesratio) and GetDistance(myHero, allies) < 1000 and allies ~= nil then
+			if Menu.miscs.packt then
+				Packet("S_CAST", {spellId = _W}):send()
+			else
+				CastSpell(_W)
+			end	
+		end
+	end
 end
 
 function _flee() --Done
@@ -284,4 +319,45 @@ function _enemisAround(range)
 		end
 	end
 	return playersCount
+end
+
+--[Lag Free Circles (by barasia, vadash and viseversa)]--
+function round(num) 
+	if num >= 0 then return math.floor(num+.5) else return math.ceil(num-.5) end
+end
+
+function DrawCircleNextLvl(x, y, z, radius, width, color, chordlength)
+    radius = radius or 300
+  quality = math.max(8,round(180/math.deg((math.asin((chordlength/(2*radius)))))))
+  quality = 2 * math.pi / quality
+  radius = radius*.92
+    local points = {}
+    for theta = 0, 2 * math.pi + quality, quality do
+        local c = WorldToScreen(D3DXVECTOR3(x + radius * math.cos(theta), y, z - radius * math.sin(theta)))
+        points[#points + 1] = D3DXVECTOR2(c.x, c.y)
+    end
+    DrawLines2(points, width or 1, color or 4294967295)
+end
+
+function DrawCircle2(x, y, z, radius, color)
+    local vPos1 = Vector(x, y, z)
+    local vPos2 = Vector(cameraPos.x, cameraPos.y, cameraPos.z)
+    local tPos = vPos1 - (vPos1 - vPos2):normalized() * radius
+    local sPos = WorldToScreen(D3DXVECTOR3(tPos.x, tPos.y, tPos.z))
+    if OnScreen({ x = sPos.x, y = sPos.y }, { x = sPos.x, y = sPos.y }) then
+        DrawCircleNextLvl(x, y, z, radius, 1, color, Menu.miscs.lagfree.CL) 
+    end
+end
+
+function _checkLf() -- Test 1.10
+	_G.oldDrawCircle = rawget(_G, 'DrawCircle')
+	_G.DrawCircle = DrawCircle2
+end
+
+function _checkLftick() -- Test 1.10
+	if not Menu.miscs.lagfree.LFC then 
+		_G.DrawCircle = _G.oldDrawCircle 
+	else
+		_G.DrawCircle = DrawCircle2
+	end
 end
